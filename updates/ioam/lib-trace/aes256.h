@@ -1,10 +1,48 @@
-#include "aes256.h"
+#ifndef aes_256_H
+#define aes_256_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define u8 unsigned char
+#define u32 unsigned int
+typedef struct AES256_Word { u8 x[4]; } AES256_Word; //4 bytes
+typedef struct AES256_State { AES256_Word x[4]; } AES256_State; //16 bytes
+
+AES256_State IncState(AES256_State);
+AES256_State AES256Encrypt(AES256_State, u8*);
+AES256_State AES256Decrypt(AES256_State, u8*);
+
+void AES256_ENC_ALGO(u8*, u8*, u8*, u32, u8*, u32*, bool);
+
+char * _Print_Word(AES256_Word);
+char * _Print_State(AES256_State);
+
+AES256_Word SubWord(AES256_Word, bool);
+AES256_Word RotWord(AES256_Word, u8);
+AES256_Word XorRcon(AES256_Word, u8);
+AES256_Word XorWord(AES256_Word, AES256_Word);
+
+void KeyExpansion(u8[], AES256_Word[]);
+
+AES256_State AddRoundKey(AES256_State, AES256_Word*, u8);
+AES256_State SubBytes(AES256_State, bool);
+AES256_State ShiftRows(AES256_State);
+AES256_Word InvMixColumn(AES256_Word);
+AES256_Word MixColumn(AES256_Word);
+AES256_State MixColumns(AES256_State, bool);
+AES256_State InvShiftRows(AES256_State);
+AES256_State XorState(AES256_State, AES256_State);
 
 #define KEY_LENGTH 8
 #define BLOCK_SIZE 4
 #define NUMB_ROUNDS 14
 
-uint8_t S_Box[256] = {
+u8 S_Box[256] = {
   0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5,
   0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
   0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0,
@@ -39,7 +77,7 @@ uint8_t S_Box[256] = {
   0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
 };
 
-uint8_t Inverse_S_Box[256] = {
+u8 Inverse_S_Box[256] = {
   0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38,
   0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
   0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87,
@@ -74,7 +112,7 @@ uint8_t Inverse_S_Box[256] = {
   0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d,
 };
 
-uint8_t R_Con[30] = {
+u8 R_Con[30] = {
   0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 
   0x40, 0x80, 0x1b, 0x36, 0x6c, 0xc0, 
   0xab, 0x4d, 0x9a, 0x2f, 0x5e, 0xbc, 
@@ -82,7 +120,56 @@ uint8_t R_Con[30] = {
   0xb3, 0x7d, 0xfa, 0xef, 0xc5, 0x91,
 };
 
-void AES256_ENC_ALG(uint8_t *key, uint8_t *data, uint8_t *iv, uint32_t datalen, uint8_t *returndata, uint32_t *returnlen, bool encrypt){
+u8 key_vect[32] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+    0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 
+    0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+  };
+
+u8 iv_vect[16] = {
+    0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+  };
+
+#define MAX_MSG_LGTH 10000
+
+char* bytes_to_hexstr(u8 *bytes, u32 length){
+  static char buffer[(u32) MAX_MSG_LGTH * 2];
+  memset(buffer, 0, strlen(buffer));
+  int i;
+  for(i = 0; i < length; i++){
+    sprintf(buffer + strlen(buffer), "%02x", bytes[i]);
+    if((i + 1) % 16 == 0){
+      sprintf(buffer + strlen(buffer),"\n");
+    }
+  }
+  if(length % 16 != 0)
+    sprintf(buffer + strlen(buffer),"\n");
+  return buffer;
+}
+
+void str_to_bytes(u8 *str, u8 *bytes){
+  int str_len = strlen(str);
+  int i;
+  for(i = 0; i < str_len; i++){
+    bytes[i] = str[i];
+  }
+}
+
+void parse_02X(u8 *key, u8 *arg, int bytes){
+  int iter;
+  for(iter = 0; iter < bytes; iter ++){
+    u8 tempbit;
+    char temp[2] = "";
+    temp[0] = (char*)arg[iter*2];
+    temp[1] = (char*)arg[iter*2+1];
+    sscanf(temp, "%02hhX", &tempbit);
+    key[iter] = tempbit;
+  }
+}
+
+void AES256_ENC_ALGO(u8 *key, u8 *data, u8 *iv, u32 datalen, u8 *returndata, u32 *returnlen, bool encrypt){
   int temp = datalen;
   int numbBlocks = ceil(datalen/16.0);
   int dataBytes = 0;
@@ -124,8 +211,7 @@ void AES256_ENC_ALG(uint8_t *key, uint8_t *data, uint8_t *iv, uint32_t datalen, 
   *returnlen = returnBytes;
 }
 
-
-AES256_State AES256Encrypt(AES256_State state, uint8_t key[32]){
+AES256_State AES256Encrypt(AES256_State state, u8 key[32]){
   AES256_Word expanse[60];
   KeyExpansion(key, expanse);
   state = AddRoundKey(state, expanse, 0);
@@ -142,7 +228,7 @@ AES256_State AES256Encrypt(AES256_State state, uint8_t key[32]){
   return state;
 }
 
-AES256_State AES256Decrypt(AES256_State state, uint8_t key[32]){
+AES256_State AES256Decrypt(AES256_State state, u8 key[32]){
   AES256_Word expanse[60];
   KeyExpansion(key, expanse);
   state = AddRoundKey(state, expanse, NUMB_ROUNDS);
@@ -180,8 +266,8 @@ char * _Print_State(AES256_State state){
 AES256_Word SubWord(AES256_Word word, bool inverse){
   int i;
   for(i = 0; i < 4; i++){
-    uint8_t higher = word.x[i] >> 4;
-    uint8_t lower = word.x[i] & 0x0f;
+    u8 higher = word.x[i] >> 4;
+    u8 lower = word.x[i] & 0x0f;
     if(inverse)
       word.x[i] = Inverse_S_Box[higher * 16 + lower];
     else
@@ -190,7 +276,7 @@ AES256_Word SubWord(AES256_Word word, bool inverse){
   return word;
 }
 
-AES256_Word RotWord(AES256_Word word, uint8_t shift){
+AES256_Word RotWord(AES256_Word word, u8 shift){
   AES256_Word temp;
   int i,j;
   j = shift;
@@ -203,8 +289,8 @@ AES256_Word RotWord(AES256_Word word, uint8_t shift){
   return temp;
 }
 
-AES256_Word XorRcon(AES256_Word word, uint8_t rcon){
-  uint8_t temp = R_Con[rcon];
+AES256_Word XorRcon(AES256_Word word, u8 rcon){
+  u8 temp = R_Con[rcon];
   word.x[0] = word.x[0] ^ temp;
   return word;
 }
@@ -217,7 +303,7 @@ AES256_Word XorWord(AES256_Word a, AES256_Word b){
   return temp;
 }
 
-void KeyExpansion(uint8_t key[32], AES256_Word *expanse){
+void KeyExpansion(u8 key[32], AES256_Word *expanse){
   int i;
   for(i = 0; i < 60; i++){
     if(i < KEY_LENGTH){
@@ -239,7 +325,7 @@ void KeyExpansion(uint8_t key[32], AES256_Word *expanse){
   }
 }
 
-AES256_State AddRoundKey(AES256_State in, AES256_Word *expanse, uint8_t round){
+AES256_State AddRoundKey(AES256_State in, AES256_Word *expanse, u8 round){
   int i;
   for(i = 0; i < 4; i++){
     in.x[i] = XorWord(in.x[i],expanse[round * 4 + i]);
@@ -278,8 +364,8 @@ AES256_State MixColumns(AES256_State in, bool inverse){
   return in;
 }
 
-uint8_t gmul(uint8_t a, uint8_t b) {
-	uint8_t p = 0; 
+u8 gmul(u8 a, u8 b) {
+	u8 p = 0; 
 	while (a && b) {
     if (b & 1) 
       p ^= a;
@@ -347,3 +433,5 @@ AES256_State IncState(AES256_State a){
   }
   return a;
 }
+
+#endif
