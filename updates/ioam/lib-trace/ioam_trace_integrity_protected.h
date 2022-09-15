@@ -5,6 +5,7 @@
 #include <math.h>
 #include <time.h>
 #include <vlib/sh2.h>
+#include <trace_util.h>
 #include <aes256.h>
 
 typedef struct {

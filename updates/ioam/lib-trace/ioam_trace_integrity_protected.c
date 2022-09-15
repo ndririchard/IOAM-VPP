@@ -83,7 +83,38 @@ void ioam_trace_integrity_AES256_handler(ioam_trace_integrity_hdr_t *hdr, u32 d,
     rl = returnlen;
 }
 
-//bool ioam_trace_check_integrity_protection(ioam_trace_integrity_hdr_t *hdr)
+void ioam_trace_integrity_get_node_data(u32 node_type, ioam_trace_hdr_t *hdr,u32 pos, trace_profile *profile, u32 *returnAddr){
+    int start = pos * (fetch_trace_data_size(profile)/4);
+    int end = start + fetch_trace_data_size(profile)/4;
+    if(node_type == IOAM_ENCAP_NODE){
+        *returnAddr = hdr->integrity_hdr.nonce + (u32) nn_len;
+    }
+    for (int i=start; i<end; i++){
+        *returnAddr += hdr->app_data[i];
+    }
+}
+
+int ioam_trace_check_integrity_protection(ioam_trace_hdr_t *hdr, trace_profile * profile){
+    int nb_of_node = profile->num_elts;
+    for (int i=0; i<nb_of_node-1; i++){
+        u32* data;
+        u32* signa;
+        u32 sl;
+        if (i == 0){
+            // check integrity of the encap node
+            ioam_trace_integrity_get_node_data(IOAM_ENCAP_NODE, hdr, i; profile, data);
+            ioam_trace_integrity_AES256_handler(&(hdr->integrity_dr), *data, *signa, sl);
+        }
+        else {
+            ioam_trace_integrity_get_node_data(IOAM_TRANSIT_NODE, hdr, i; profile, data);
+            ioam_trace_integrity_AES256_handler(&(hdr->integrity_dr), *data, *signa, sl);
+        }
+        if (signa != hdr->integrity_hdr.signature[i])
+            return (-1);
+        
+    }
+    return 0;
+}
 
 
 
